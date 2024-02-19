@@ -1,271 +1,243 @@
-@description('The name of the administrator account of the new VM and domain')
-param adminUsername string
-
-@description('The password for the administrator account of the new VM and domain')
-@secure()
-param adminPassword string
-
-@description('The FQDN of the Active Directory Domain to be created')
-param domainName string
-
-@description('The DNS prefix for the public IP address used by the Load Balancer')
-param dnsPrefix string
-
-@description('Size of the VM for the controller')
-param vmSize string = 'Standard_D2s_v3'
-
-@description('The location of resources, such as templates and DSC modules, that the template depends on')
-param _artifactsLocation string = deployment().properties.templateLink.uri
-
-@description('Auto-generated token to access _artifactsLocation. Leave it blank unless you need to provide your own value.')
-@secure()
-param _artifactsLocationSasToken string = ''
-
-@description('Location for all resources.')
+@description('Deployment Location')
 param location string = resourceGroup().location
 
-@description('Virtual machine name.')
-@maxLength(15)
-param virtualMachineName string = 'adVM'
+@description('Name of VMSS Cluster')
+param vmssName string
 
-@description('Virtual network name.')
-param virtualNetworkName string = 'adVNET'
+@description('GameDev Sku')
+param vmssSku string = 'Standard_D4ds_v4'
 
-@description('Virtual network address range.')
-param virtualNetworkAddressRange string = '10.0.0.0/16'
+@description('GameDev Image Publisher')
+@allowed([
+  'microsoftcorporation1602274591143'
+  'azure-gaming'
+])
+param vmssImgPublisher string = 'microsoftcorporation1602274591143'
 
-@description('Load balancer front end IP address name.')
-param loadBalancerFrontEndIPName string = 'LBFE'
+@description('GameDev Image Product Id')
+@allowed([
+  'game-dev-vm'
+])
+param vmssImgProduct string = 'game-dev-vm'
 
-@description('Backend address pool name.')
-param backendAddressPoolName string = 'LBBE'
+@description('GameDev Image Sku')
+@allowed([
+  'win10_no_engine_1_0'
+  'ws2019_no_engine_1_0'
+  'win10_unreal_4_27_2'
+  'ws2019_unreal_4_27_2'
+  'win10_unreal_5_0_1'
+  'ws2019_unreal_5_0_1'
+])
+param vmssImgSku string = 'win10_unreal_4_27_2'
 
-@description('Inbound NAT rules name.')
-param inboundNatRulesName string = 'adRDP'
+@description('GameDev Image Product Id')
+param vmssImgVersion string = 'latest'
 
-@description('Network interface name.')
-param networkInterfaceName string = 'adNic'
+@description('GameDev Disk Type')
+param vmssOsDiskType string = 'Premium_LRS'
 
-@description('Private IP address.')
-param privateIPAddress string = '10.0.0.4'
+@description('VMSS Instance Count')
+@maxValue(100)
+@minValue(1)
+param vmssInstanceCount int = 1
 
-@description('Subnet name.')
-param subnetName string = 'adSubnet'
+@description('Administrator Login for access')
+param administratorLogin string
 
-@description('Subnet IP range.')
-param subnetRange string = '10.0.0.0/24'
+@description('Administrator Password for access')
+@secure()
+param passwordAdministratorLogin string
 
-@description('Subnet IP range.')
-param publicIPAddressName string = 'adPublicIP'
+@description('File Share Storage Account name')
+param fileShareStorageAccount string = ''
 
-@description('Availability set name.')
-param availabilitySetName string = 'adAvailabiltySet'
+@description('File Share Storage Account key')
+@secure()
+param fileShareStorageAccountKey string = ''
 
-@description('Load balancer name.')
-param loadBalancerName string = 'adLoadBalancer'
+@description('File Share name')
+param fileShareName string = ''
 
-resource publicIPAddress 'Microsoft.Network/publicIPAddresses@2022-07-01' = {
-  name: publicIPAddressName
-  location: location
-  properties: {
-    publicIPAllocationMethod: 'Static'
-    dnsSettings: {
-      domainNameLabel: dnsPrefix
-    }
+@description('Perforce Port address')
+param p4Port string = ''
+
+@description('Perforce User')
+param p4Username string = ''
+
+@description('Perforce User password')
+@secure()
+param p4Password string = ''
+
+@description('Perforce Client Workspace')
+param p4Workspace string = ''
+
+@description('Perforce Stream')
+param p4Stream string = ''
+
+@description('Perforce Depot Client View mappings')
+param p4ClientViews string = ''
+
+@description('Incredibuild License Key')
+@secure()
+param ibLicenseKey string = ''
+
+@description('GDK Version')
+param gdkVersion string = 'June_2021_Update_4'
+
+@description('Use VM to sysprep an image from')
+param useVmToSysprepCustomImage bool = false
+
+@description('Remote Access technology')
+@allowed([
+  'RDP'
+  'Teradici'
+  'Parsec'
+])
+param remoteAccessTechnology string = 'RDP'
+
+@description('Teradici Registration Key')
+@secure()
+param teradiciRegKey string = ''
+
+@description('Parsec Team ID')
+param parsecTeamId string = ''
+
+@description('Parsec Team Key')
+@secure()
+param parsecTeamKey string = ''
+
+@description('Parsec Hostname')
+param parsecHost string = ''
+
+@description('Parsec User Email')
+param parsecUserEmail string = ''
+
+@description('Parsec Is Guest Access')
+param parsecIsGuestAccess bool = false
+
+@description('Virtual Network Resource Name')
+param vnetName string = 'vnet-${vmssName}'
+
+@description('Virtual Network Subnet Name')
+param subnetName string = 'subnet${vmssName}'
+
+@description('Virtual Network Security Group Name')
+param networkSecurityGroupName string = 'nsg-${vmssName}'
+
+@description('Virtual Network Address Prefix')
+param vnetAddressPrefix string = '172.17.72.0/24' //Change as needed
+
+@description('Virtual Network Subnet Address Prefix')
+param subnetAddressPrefix string = '172.17.72.0/25' // 172.17.72.[0-128] is part of this subnet
+
+var customData = format('''
+fileShareStorageAccount={0}
+fileShareStorageAccountKey={1}
+fileShareName={2}
+p4Port={3}
+p4Username={4}
+p4Password={5}
+p4Workspace={6}
+p4Stream={7}
+p4ClientViews={8}
+ibLicenseKey={9}
+gdkVersion={10}
+useVmToSysprepCustomImage={11}
+remoteAccessTechnology={12}
+teradiciRegKey={13}
+parsecTeamId={14}
+parsecTeamKey={15}
+parsecHost={16}
+parsecUserEmail={17}
+parsecIsGuestAccess={18}
+deployedFromSolutionTemplate={19}
+''', fileShareStorageAccount, fileShareStorageAccountKey, fileShareName, p4Port, p4Username, p4Password, p4Workspace, p4Stream, p4ClientViews, ibLicenseKey, gdkVersion, useVmToSysprepCustomImage, remoteAccessTechnology, teradiciRegKey, parsecTeamId, parsecTeamKey, parsecHost, parsecUserEmail, parsecIsGuestAccess, false)
+
+
+module vnet './nestedtemplates/virtualNetworks.bicep'  = {
+  name:                       vnetName
+  params: {
+    location:                 location
+    vnetName:                 vnetName
+    subnetName:               subnetName
+    networkSecurityGroupName: networkSecurityGroupName
+    vnetAddressPrefix:        vnetAddressPrefix
+    subnetAddressPrefix:      subnetAddressPrefix
   }
 }
 
-resource availabilitySet 'Microsoft.Compute/availabilitySets@2022-08-01' = {
+resource vmss 'Microsoft.Compute/virtualMachineScaleSets@2021-04-01' = {
+  name: vmssName
   location: location
-  name: availabilitySetName
-  properties: {
-    platformUpdateDomainCount: 20
-    platformFaultDomainCount: 2
-  }
   sku: {
-    name: 'Aligned'
+    name:     vmssSku
+    tier:     'Standard'
+    capacity: vmssInstanceCount
   }
-}
-
-module VNet 'nestedtemplates/vnet.bicep' = {
-  scope: resourceGroup()
-  name: 'VNet'
-  params: {
-    virtualNetworkName: virtualNetworkName
-    virtualNetworkAddressRange: virtualNetworkAddressRange
-    subnetName: subnetName
-    subnetRange: subnetRange
-    location: location
-  }
-}
-
-resource loadBalancer 'Microsoft.Network/loadBalancers@2022-07-01' = {
-  name: loadBalancerName
-  location: location
+  plan: {
+    name:      vmssImgSku
+    publisher: vmssImgPublisher
+    product:   vmssImgProduct
+  }  
   properties: {
-    frontendIPConfigurations: [
-      {
-        name: loadBalancerFrontEndIPName
-        properties: {
-          publicIPAddress: {
-            id: publicIPAddress.id
-          }
-        }
-      }
-    ]
-    backendAddressPools: [
-      {
-        name: backendAddressPoolName
-      }
-    ]
-    inboundNatRules: [
-      {
-        name: inboundNatRulesName
-        properties: {
-          frontendIPConfiguration: {
-            id: resourceId('Microsoft.Network/loadBalancers/frontendIPConfigurations', loadBalancerName, loadBalancerFrontEndIPName)
-          }
-          protocol: 'Tcp'
-          frontendPort: 3389
-          backendPort: 3389
-          enableFloatingIP: false
-        }
-      }
-    ]
-  }
-}
-
-resource networkInterface 'Microsoft.Network/networkInterfaces@2022-07-01' = {
-  name: networkInterfaceName
-  location: location
-  properties: {
-    ipConfigurations: [
-      {
-        name: 'ipconfig1'
-        properties: {
-          privateIPAllocationMethod: 'Static'
-          privateIPAddress: privateIPAddress
-          subnet: {
-            id: resourceId('Microsoft.Network/virtualNetworks/subnets', virtualNetworkName, subnetName)
-          }
-          loadBalancerBackendAddressPools: [
-            {
-              id: resourceId('Microsoft.Network/loadBalancers/backendAddressPools', loadBalancerName, backendAddressPoolName)
-            }
-          ]
-          loadBalancerInboundNatRules: [
-            {
-              id: resourceId('Microsoft.Network/loadBalancers/inboundNatRules', loadBalancerName, inboundNatRulesName)
-            }
-          ]
-        }
-      }
-    ]
-  }
-  dependsOn: [
-    VNet
-    loadBalancer
-  ]
-}
-
-resource virtualMachine 'Microsoft.Compute/virtualMachines@2022-08-01' = {
-  name: virtualMachineName
-  location: location
-  properties: {
-    hardwareProfile: {
-      vmSize: vmSize
+    singlePlacementGroup: false
+    upgradePolicy: {
+      mode: 'Manual'
     }
-    availabilitySet: {
-      id: availabilitySet.id
-    }
-    osProfile: {
-      computerName: virtualMachineName
-      adminUsername: adminUsername
-      adminPassword: adminPassword
-    }
-    storageProfile: {
-      imageReference: {
-        publisher: 'MicrosoftWindowsServer'
-        offer: 'WindowsServer'
-        sku: '2019-Datacenter'
-        version: 'latest'
-      }
-      osDisk: {
-        name: '${virtualMachineName}_OSDisk'
-        caching: 'ReadOnly'
-        createOption: 'FromImage'
-        managedDisk: {
-          storageAccountType: 'StandardSSD_LRS'
-        }
-      }
-      dataDisks: [
-        {
-          name: '${virtualMachineName}_DataDisk'
+    virtualMachineProfile: {
+      storageProfile: {
+        osDisk: {
+          createOption: 'FromImage'
           caching: 'ReadWrite'
-          createOption: 'Empty'
-          diskSizeGB: 20
           managedDisk: {
-            storageAccountType: 'StandardSSD_LRS'
+            storageAccountType: vmssOsDiskType
           }
-          lun: 0
         }
-      ]
+        imageReference: {
+          publisher: vmssImgPublisher
+          offer:     vmssImgProduct
+          sku:       vmssImgSku
+          version:   vmssImgVersion
+	}
+      }
+      networkProfile: {
+        networkInterfaceConfigurations: [
+          {
+            name: '${vmssName}Nic'
+            properties: {
+              primary: true
+              ipConfigurations: [
+                {
+                  name: '${vmssName}IpConfig'
+                  properties: {
+                    subnet: {
+                      id: vnet.outputs.subnetId
+                    }
+                  }
+                }
+              ]
+              networkSecurityGroup: {
+                id: vnet.outputs.nsgID
+              }
+            }
+          }
+        ]
+      }
+      osProfile: {
+        computerNamePrefix: vmssName
+        adminUsername:      administratorLogin
+        adminPassword:      passwordAdministratorLogin
+	customData:         base64(customData)
+	windowsConfiguration: {
+          provisionVMAgent: true
+        }	
+      }
+      priority: 'Regular'
     }
-    networkProfile: {
-      networkInterfaces: [
-        {
-          id: networkInterface.id
-        }
-      ]
-    }
+    overprovision: false
   }
-  dependsOn: [
-    loadBalancer
-  ]
 }
 
-resource createADForest 'Microsoft.Compute/virtualMachines/extensions@2022-08-01' = {
-  parent: virtualMachine
-  name: 'CreateADForest'
-  location: location
-  properties: {
-    publisher: 'Microsoft.Powershell'
-    type: 'DSC'
-    typeHandlerVersion: '2.19'
-    autoUpgradeMinorVersion: true
-    settings: {
-      ModulesUrl: uri(_artifactsLocation, 'DSC/CreateADPDC.zip${_artifactsLocationSasToken}')
-      ConfigurationFunction: 'CreateADPDC.ps1\\CreateADPDC'
-      Properties: {
-        DomainName: domainName
-        AdminCreds: {
-          UserName: adminUsername
-          Password: 'PrivateSettingsRef:AdminPassword'
-        }
-      }
-    }
-    protectedSettings: {
-      Items: {
-        AdminPassword: adminPassword
-      }
-    }
-  }
-}
-
-module updateVNetDNS 'nestedtemplates/vnet-with-dns-server.bicep' = {
-  scope: resourceGroup()
-  name: 'UpdateVNetDNS'
-  params: {
-    virtualNetworkName: virtualNetworkName
-    virtualNetworkAddressRange: virtualNetworkAddressRange
-    subnetName: subnetName
-    subnetRange: subnetRange
-    DNSServerAddress: [
-      privateIPAddress
-    ]
-    location: location
-  }
-  dependsOn: [
-    createADForest
-  ]
-}
+output id   string = vmss.id
+output name string = vmss.name
